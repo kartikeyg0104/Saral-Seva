@@ -1,9 +1,9 @@
 // API Configuration and Base Setup
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://saral-seva-backend.onrender.com/api';
 
 // Mock authentication for development
 const MOCK_AUTH = {
-  enabled: false, // Set to false when backend is ready
+  enabled: import.meta.env.VITE_NODE_ENV === 'development' || !import.meta.env.VITE_API_URL, // Enable if in dev or no API URL set
   get users() {
     // Get users from localStorage or use defaults
     const stored = localStorage.getItem('mock_auth_users');
