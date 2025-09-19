@@ -63,6 +63,7 @@ app.use(cors({
     'http://localhost:5173',
     'http://localhost:8080',
     'http://localhost:3000',
+    'https://saral-seva-frontend.onrender.com',
     process.env.FRONTEND_URL || 'http://localhost:5173'
   ],
   credentials: true,

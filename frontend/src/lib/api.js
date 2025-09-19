@@ -3,7 +3,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api'
 
 // Mock authentication for development
 const MOCK_AUTH = {
-  enabled: true, // Set to false when backend is ready
+  enabled: false, // Set to false when backend is ready
   get users() {
     // Get users from localStorage or use defaults
     const stored = localStorage.getItem('mock_auth_users');
