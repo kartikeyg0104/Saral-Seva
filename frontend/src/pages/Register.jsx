@@ -34,6 +34,16 @@ const Register = () => {
     phone: "",
     password: "",
     confirmPassword: "",
+    dateOfBirth: "",
+    gender: "",
+    address: {
+      city: "",
+      state: "",
+      pincode: ""
+    },
+    occupation: "",
+    annualIncome: "",
+    category: "",
     acceptTerms: false,
     acceptPrivacy: false
   });
@@ -63,8 +73,10 @@ const Register = () => {
     }
     if (!formData.password) {
       newErrors.password = "Password is required";
-    } else if (formData.password.length < 8) {
-      newErrors.password = "Password must be at least 8 characters";
+    } else if (formData.password.length < 6) {
+      newErrors.password = "Password must be at least 6 characters";
+    } else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
+      newErrors.password = "Password must contain at least one uppercase letter, one lowercase letter, and one number";
     }
     if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = "Passwords do not match";
@@ -77,7 +89,19 @@ const Register = () => {
   };
 
   const handleInputChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    if (field.includes('.')) {
+      const [parent, child] = field.split('.');
+      setFormData(prev => ({
+        ...prev,
+        [parent]: {
+          ...prev[parent],
+          [child]: value
+        }
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
+    
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: "" }));
     }
@@ -94,7 +118,17 @@ const Register = () => {
         lastName: formData.lastName,
         email: formData.email,
         phone: formData.phone,
-        password: formData.password
+        password: formData.password,
+        dateOfBirth: formData.dateOfBirth || undefined,
+        gender: formData.gender || undefined,
+        address: {
+          city: formData.address.city || undefined,
+          state: formData.address.state || undefined,
+          pincode: formData.address.pincode || undefined
+        },
+        occupation: formData.occupation || undefined,
+        annualIncome: formData.annualIncome ? parseFloat(formData.annualIncome) : undefined,
+        category: formData.category || undefined
       });
       
       if (result.success) {
@@ -265,7 +299,7 @@ const Register = () => {
                   </p>
                 )}
                 <div className="text-xs text-muted-foreground">
-                  Password must be at least 8 characters long
+                  Password must be at least 6 characters with uppercase, lowercase, and number
                 </div>
               </div>
 
@@ -299,6 +333,115 @@ const Register = () => {
                     {errors.confirmPassword}
                   </p>
                 )}
+              </div>
+
+              {/* Additional Information (Optional) */}
+              <div className="space-y-4">
+                <div className="text-sm font-medium text-muted-foreground">
+                  Additional Information (Optional - can be completed later)
+                </div>
+                
+                {/* Date of Birth */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Date of Birth</label>
+                  <input
+                    type="date"
+                    value={formData.dateOfBirth}
+                    onChange={(e) => handleInputChange("dateOfBirth", e.target.value)}
+                    className="w-full px-3 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+
+                {/* Gender */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Gender</label>
+                  <select
+                    value={formData.gender}
+                    onChange={(e) => handleInputChange("gender", e.target.value)}
+                    className="w-full px-3 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                    <option value="prefer-not-to-say">Prefer not to say</option>
+                  </select>
+                </div>
+
+                {/* Address */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">City</label>
+                    <input
+                      type="text"
+                      value={formData.address.city}
+                      onChange={(e) => handleInputChange("address.city", e.target.value)}
+                      placeholder="Enter city"
+                      className="w-full px-3 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">State</label>
+                    <input
+                      type="text"
+                      value={formData.address.state}
+                      onChange={(e) => handleInputChange("address.state", e.target.value)}
+                      placeholder="Enter state"
+                      className="w-full px-3 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Pincode</label>
+                    <input
+                      type="text"
+                      value={formData.address.pincode}
+                      onChange={(e) => handleInputChange("address.pincode", e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="Enter pincode"
+                      className="w-full px-3 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                </div>
+
+                {/* Occupation and Income */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Occupation</label>
+                    <input
+                      type="text"
+                      value={formData.occupation}
+                      onChange={(e) => handleInputChange("occupation", e.target.value)}
+                      placeholder="Enter occupation"
+                      className="w-full px-3 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Annual Income (₹)</label>
+                    <input
+                      type="number"
+                      value={formData.annualIncome}
+                      onChange={(e) => handleInputChange("annualIncome", e.target.value)}
+                      placeholder="Enter annual income"
+                      className="w-full px-3 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                </div>
+
+                {/* Category */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Category</label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => handleInputChange("category", e.target.value)}
+                    className="w-full px-3 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">Select Category</option>
+                    <option value="general">General</option>
+                    <option value="obc">OBC</option>
+                    <option value="sc">SC</option>
+                    <option value="st">ST</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
               </div>
 
               {/* Terms and Privacy */}

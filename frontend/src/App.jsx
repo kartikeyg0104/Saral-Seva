@@ -17,6 +17,7 @@ import Register from "./pages/Register";
 import Search from "./pages/Search";
 import Notifications from "./pages/Notifications";
 import Profile from "./pages/Profile";
+import SarkarQnA from "./pages/SarkarQnA";
 import Language from "./components/Language";
 import NotFound from "./pages/NotFound";
 import Header from "./components/Header";
@@ -44,7 +45,7 @@ const App = () => {
           <TooltipProvider>
             <Toaster />
             <Sonner />
-            <BrowserRouter>
+            <BrowserRouter future={{ v7_relativeSplatPath: true }}>
               <div className="min-h-screen flex flex-col">
                 <Header />
                 <main className="flex-1">
@@ -55,6 +56,7 @@ const App = () => {
                     <Route path="/schemes" element={<Schemes />} />
                     <Route path="/events" element={<Events />} />
                     <Route path="/locations" element={<Locations />} />
+                    <Route path="/sarkarqna" element={<SarkarQnA />} />
                     <Route path="/language" element={<Language />} />
                     
                     {/* Protected Routes */}

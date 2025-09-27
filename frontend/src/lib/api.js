@@ -1,5 +1,5 @@
 // API Configuration and Base Setup
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://saral-seva-backend.onrender.com/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 // Mock authentication for development
 const MOCK_AUTH = {

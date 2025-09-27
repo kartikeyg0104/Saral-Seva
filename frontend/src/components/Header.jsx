@@ -51,6 +51,7 @@ const Header = () => {
     { name: t('nav.events'), href: "/events" },
     { name: t('nav.complaints'), href: "/complaints" },
     { name: t('nav.locations'), href: "/locations" },
+    { name: "SarkarQnA", href: "/sarkarqna" },
   ];
 
   const availableLanguages = [

@@ -23,6 +23,7 @@ import notificationRoutes from './src/routes/notification.js';
 import dashboardRoutes from './src/routes/dashboard.js';
 import chatbotRoutes from './src/routes/chatbot.js';
 import taxRoutes from './src/routes/tax.js';
+import qaRoutes from './src/routes/qa.js';
 
 // Import middleware
 import { errorHandler } from './src/middleware/errorHandler.js';
@@ -99,6 +100,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/tax', taxRoutes);
+app.use('/api/qa', qaRoutes);
 
 // Welcome route
 app.get('/', (req, res) => {

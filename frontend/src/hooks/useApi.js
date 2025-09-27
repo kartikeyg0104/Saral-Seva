@@ -333,3 +333,39 @@ export const useChatbot = () => {
     },
   });
 };
+
+// Generic API Call Hook
+export const useApi = () => {
+  const apiCall = async (url, options = {}) => {
+    try {
+      const token = localStorage.getItem('token');
+      const defaultOptions = {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      };
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${url}`, {
+        ...defaultOptions,
+        ...options,
+        headers: {
+          ...defaultOptions.headers,
+          ...options.headers,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('API call failed:', error);
+      throw error;
+    }
+  };
+
+  return { apiCall };
+};

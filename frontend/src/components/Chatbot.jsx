@@ -21,8 +21,15 @@ import {
   Star,
   Search,
   Phone,
-  Video
+  Video,
+  Languages,
+  Shield,
+  CheckCircle,
+  XCircle,
+  ExternalLink,
+  Info
 } from "lucide-react";
+import { useApi } from "../hooks/useApi";
 
 const Chatbot = ({ isMinimized = false, onToggleMinimize, onClose }) => {
   const [messages, setMessages] = useState([
@@ -43,13 +50,23 @@ const Chatbot = ({ isMinimized = false, onToggleMinimize, onClose }) => {
   const [inputMessage, setInputMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState("en");
+  const [aiResponse, setAiResponse] = useState(null);
+  const [showSources, setShowSources] = useState(false);
   const messagesEndRef = useRef(null);
+  const { apiCall } = useApi();
 
   const quickActions = [
     { icon: Search, label: "Find Schemes", query: "What schemes am I eligible for?" },
     { icon: FileText, label: "Check Status", query: "How do I check my application status?" },
     { icon: HelpCircle, label: "Get Help", query: "I need help with document verification" },
     { icon: Phone, label: "Contact Info", query: "How can I contact government offices?" }
+  ];
+
+  const languageOptions = [
+    { value: "en", label: "English", flag: "🇺🇸" },
+    { value: "hi", label: "हिंदी", flag: "🇮🇳" },
+    { value: "hinglish", label: "Hinglish", flag: "🔄" }
   ];
 
   const knowledgeBase = {
@@ -84,12 +101,80 @@ const Chatbot = ({ isMinimized = false, onToggleMinimize, onClose }) => {
     setInputMessage("");
     setIsTyping(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const botResponse = generateBotResponse(inputMessage);
-      setMessages(prev => [...prev, botResponse]);
-      setIsTyping(false);
-    }, 1500);
+    try {
+      // Call AI Q&A API with Gemini
+      const response = await apiCall('/api/qa/ask', {
+        method: 'POST',
+        body: JSON.stringify({
+          question: inputMessage,
+          language: selectedLanguage,
+          includeUserProfile: true
+        })
+      });
+
+      if (response.success) {
+        const aiData = response.data;
+        setAiResponse(aiData);
+        
+        const botResponse = {
+          id: messages.length + 2,
+          type: "bot",
+          content: aiData.answer,
+          timestamp: new Date(),
+          confidence: aiData.confidence,
+          sources: aiData.sources,
+          relevantSchemes: aiData.relevantSchemes,
+          suggestions: generateSuggestions(aiData.relevantSchemes)
+        };
+        
+        setMessages(prev => [...prev, botResponse]);
+      } else {
+        // Fallback to simple response
+        const botResponse = generateBotResponse(inputMessage);
+        setMessages(prev => [...prev, botResponse]);
+      }
+    } catch (error) {
+      console.error('Error calling AI service:', error);
+      
+      // More specific error handling
+      let errorMessage = "I'm experiencing technical difficulties. Please try again in a moment.";
+      
+      if (error.message?.includes('fetch')) {
+        errorMessage = "Unable to connect to the AI service. Please check your internet connection and try again.";
+      } else if (error.message?.includes('timeout')) {
+        errorMessage = "The request is taking longer than expected. Please try again.";
+      } else if (error.message?.includes('500')) {
+        errorMessage = "The AI service is temporarily unavailable. Please try again in a few moments.";
+      }
+      
+      const errorResponse = {
+        id: messages.length + 2,
+        type: "bot",
+        content: errorMessage,
+        timestamp: new Date(),
+        confidence: 0
+      };
+      setMessages(prev => [...prev, errorResponse]);
+    }
+
+    setIsTyping(false);
+  };
+
+  const generateSuggestions = (relevantSchemes) => {
+    if (!relevantSchemes || relevantSchemes.length === 0) {
+      return ["Find schemes for me", "Document verification", "Application help", "Contact support"];
+    }
+
+    const suggestions = [];
+    relevantSchemes.slice(0, 3).forEach(scheme => {
+      suggestions.push(`Tell me about ${scheme.name}`);
+    });
+    
+    if (relevantSchemes.length > 0) {
+      suggestions.push("How to apply for this scheme?");
+    }
+    
+    return suggestions;
   };
 
   const generateBotResponse = (userInput) => {
@@ -170,11 +255,26 @@ const Chatbot = ({ isMinimized = false, onToggleMinimize, onClose }) => {
             <Bot className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="font-semibold">AI Assistant</h3>
-            <p className="text-xs opacity-80">Government Services Helper</p>
+            <h3 className="font-semibold">SarkarQnA</h3>
+            <p className="text-xs opacity-80">AI Scheme Eligibility Bot</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
+          {/* Language Selector */}
+          <div className="flex items-center gap-1 mr-2">
+            <Languages className="h-4 w-4" />
+            <select
+              value={selectedLanguage}
+              onChange={(e) => setSelectedLanguage(e.target.value)}
+              className="bg-primary-foreground/10 text-primary-foreground text-xs border-none rounded px-1 py-0.5"
+            >
+              {languageOptions.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.flag} {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
           <Button
             variant="ghost"
             size="icon"
@@ -225,10 +325,64 @@ const Chatbot = ({ isMinimized = false, onToggleMinimize, onClose }) => {
                 }`}
               >
                 <p className="text-sm">{message.content}</p>
+                
+                {/* AI Response Metadata */}
+                {message.type === 'bot' && message.confidence && (
+                  <div className="flex items-center gap-2 mt-2 text-xs opacity-70">
+                    <div className="flex items-center gap-1">
+                      <Shield className="h-3 w-3" />
+                      <span>Confidence: {message.confidence}%</span>
+                    </div>
+                    {message.sources && message.sources.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowSources(!showSources)}
+                        className="h-5 px-2 text-xs"
+                      >
+                        <Info className="h-3 w-3 mr-1" />
+                        Sources ({message.sources.length})
+                      </Button>
+                    )}
+                  </div>
+                )}
+                
                 <p className={`text-xs mt-1 opacity-70`}>
                   {formatTime(message.timestamp)}
                 </p>
               </div>
+              
+              {/* Sources */}
+              {message.type === 'bot' && message.sources && showSources && (
+                <div className="mt-2 p-2 bg-accent/50 rounded-lg mr-2">
+                  <h4 className="text-xs font-semibold mb-2">Sources:</h4>
+                  {message.sources.map((source, index) => (
+                    <div key={index} className="text-xs mb-1 flex items-center gap-2">
+                      <ExternalLink className="h-3 w-3" />
+                      <span>{source.schemeName}</span>
+                      <span className="opacity-60">({Math.round(source.similarity * 100)}% match)</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* Relevant Schemes */}
+              {message.type === 'bot' && message.relevantSchemes && message.relevantSchemes.length > 0 && (
+                <div className="mt-2 space-y-2 mr-2">
+                  <h4 className="text-xs font-semibold">Relevant Schemes:</h4>
+                  {message.relevantSchemes.slice(0, 3).map((scheme, index) => (
+                    <div key={index} className="p-2 bg-accent/30 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium">{scheme.name}</span>
+                        <Badge variant="secondary" className="text-xs">
+                          {Math.round(scheme.similarity * 100)}% match
+                        </Badge>
+                      </div>
+                      <p className="text-xs opacity-70 mt-1">{scheme.description}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
               
               {/* Suggestions */}
               {message.suggestions && message.suggestions.length > 0 && (
