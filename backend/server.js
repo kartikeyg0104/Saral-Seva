@@ -67,11 +67,13 @@ const corsOptions = {
     const allowedOrigins = [
       'http://localhost:5173',
       'http://localhost:8080', 
+      'http://localhost:8081',
       'http://localhost:3000',
       'http://localhost:4173',
       'https://saral-seva-frontend.onrender.com',
       process.env.FRONTEND_URL,
-      process.env.FRONTEND_DEV_URL
+      process.env.FRONTEND_DEV_URL,
+      process.env.FRONTEND_DEV_URL_ALT
     ].filter(Boolean);
     
     if (allowedOrigins.indexOf(origin) !== -1) {
