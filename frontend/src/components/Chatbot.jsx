@@ -29,7 +29,6 @@ import {
   ExternalLink,
   Info
 } from "lucide-react";
-import { useApi } from "../hooks/useApi";
 
 const Chatbot = ({ isMinimized = false, onToggleMinimize, onClose }) => {
   const [messages, setMessages] = useState([
@@ -54,7 +53,6 @@ const Chatbot = ({ isMinimized = false, onToggleMinimize, onClose }) => {
   const [aiResponse, setAiResponse] = useState(null);
   const [showSources, setShowSources] = useState(false);
   const messagesEndRef = useRef(null);
-  const { apiCall } = useApi();
 
   const quickActions = [
     { icon: Search, label: "Find Schemes", query: "What schemes am I eligible for?" },
@@ -98,43 +96,99 @@ const Chatbot = ({ isMinimized = false, onToggleMinimize, onClose }) => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const messageToSend = inputMessage;
     setInputMessage("");
     setIsTyping(true);
 
     try {
-      // Call AI Q&A API with Gemini
-      const response = await apiCall('/api/qa/ask', {
+      // Direct call to Google Gemini API
+      const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
+      console.log('API Key loaded:', GOOGLE_API_KEY ? 'Yes' : 'No');
+      
+      if (!GOOGLE_API_KEY) {
+        throw new Error('Google API key not found in environment variables');
+      }
+      
+      const systemPrompt = `You are Saral Seva AI Assistant, a helpful AI for Indian government services. You help citizens with:
+- Government schemes and eligibility (PM-KISAN, Ayushman Bharat, PMAY, Startup India, etc.)
+- Application processes and status
+- Document verification
+- Government office locations
+- Tax-related queries
+- Digital services and e-governance
+
+Be helpful, accurate, and provide specific guidance. Keep responses concise but informative. Always suggest next steps when possible.
+
+User message: ${messageToSend}`;
+
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${GOOGLE_API_KEY}`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          question: inputMessage,
-          language: selectedLanguage,
-          includeUserProfile: true
+          contents: [{
+            parts: [{
+              text: systemPrompt
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 1024,
+          },
+          safetySettings: [
+            {
+              category: "HARM_CATEGORY_HARASSMENT",
+              threshold: "BLOCK_NONE"
+            },
+            {
+              category: "HARM_CATEGORY_HATE_SPEECH",
+              threshold: "BLOCK_NONE"
+            },
+            {
+              category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              threshold: "BLOCK_NONE"
+            },
+            {
+              category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+              threshold: "BLOCK_NONE"
+            }
+          ]
         })
       });
 
-      if (response.success) {
-        const aiData = response.data;
-        setAiResponse(aiData);
-        
-        const botResponse = {
-          id: messages.length + 2,
-          type: "bot",
-          content: aiData.answer,
-          timestamp: new Date(),
-          confidence: aiData.confidence,
-          sources: aiData.sources,
-          relevantSchemes: aiData.relevantSchemes,
-          suggestions: generateSuggestions(aiData.relevantSchemes)
-        };
-        
-        setMessages(prev => [...prev, botResponse]);
-      } else {
-        // Fallback to simple response
-        const botResponse = generateBotResponse(inputMessage);
-        setMessages(prev => [...prev, botResponse]);
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${response.status}`);
       }
+
+      const data = await response.json();
+      
+      let aiResponse;
+      if (data.candidates && data.candidates.length > 0 && data.candidates[0].content) {
+        aiResponse = data.candidates[0].content.parts?.[0]?.text;
+      }
+      
+      if (!aiResponse) {
+        throw new Error('No response from Gemini API');
+      }
+
+      // Generate suggestions based on the query
+      const suggestions = generateSmartSuggestions(messageToSend.toLowerCase());
+
+      const botResponse = {
+        id: messages.length + 2,
+        type: "bot",
+        content: aiResponse,
+        timestamp: new Date(),
+        suggestions: suggestions
+      };
+      
+      setMessages(prev => [...prev, botResponse]);
+
     } catch (error) {
-      console.error('Error calling AI service:', error);
+      console.error('Error calling Gemini API:', error);
       
       // More specific error handling
       let errorMessage = "I'm experiencing technical difficulties. Please try again in a moment.";
@@ -143,16 +197,15 @@ const Chatbot = ({ isMinimized = false, onToggleMinimize, onClose }) => {
         errorMessage = "Unable to connect to the AI service. Please check your internet connection and try again.";
       } else if (error.message?.includes('timeout')) {
         errorMessage = "The request is taking longer than expected. Please try again.";
-      } else if (error.message?.includes('500')) {
-        errorMessage = "The AI service is temporarily unavailable. Please try again in a few moments.";
+      } else if (error.message?.includes('403') || error.message?.includes('API key')) {
+        errorMessage = "API configuration error. Please contact support.";
       }
       
       const errorResponse = {
         id: messages.length + 2,
         type: "bot",
         content: errorMessage,
-        timestamp: new Date(),
-        confidence: 0
+        timestamp: new Date()
       };
       setMessages(prev => [...prev, errorResponse]);
     }
@@ -160,21 +213,26 @@ const Chatbot = ({ isMinimized = false, onToggleMinimize, onClose }) => {
     setIsTyping(false);
   };
 
-  const generateSuggestions = (relevantSchemes) => {
-    if (!relevantSchemes || relevantSchemes.length === 0) {
-      return ["Find schemes for me", "Document verification", "Application help", "Contact support"];
-    }
-
+  const generateSmartSuggestions = (message) => {
     const suggestions = [];
-    relevantSchemes.slice(0, 3).forEach(scheme => {
-      suggestions.push(`Tell me about ${scheme.name}`);
-    });
     
-    if (relevantSchemes.length > 0) {
-      suggestions.push("How to apply for this scheme?");
+    if (message.includes('scheme') || message.includes('eligibility')) {
+      suggestions.push("Find schemes for me", "Check eligibility", "Application process");
+    } else if (message.includes('document') || message.includes('verification')) {
+      suggestions.push("Verify documents", "Required documents", "Upload documents");
+    } else if (message.includes('status') || message.includes('application')) {
+      suggestions.push("Track application", "Check status", "Application timeline");
+    } else if (message.includes('pm-kisan') || message.includes('kisan')) {
+      suggestions.push("PM-KISAN eligibility", "PM-KISAN benefits", "How to apply");
+    } else if (message.includes('ayushman') || message.includes('health')) {
+      suggestions.push("Ayushman benefits", "Find hospitals", "Get health card");
+    } else if (message.includes('startup')) {
+      suggestions.push("Startup benefits", "Registration", "Funding options");
+    } else {
+      suggestions.push("Find schemes", "Document verification", "Check status", "Get help");
     }
     
-    return suggestions;
+    return suggestions.slice(0, 4);
   };
 
   const generateBotResponse = (userInput) => {
@@ -247,9 +305,9 @@ const Chatbot = ({ isMinimized = false, onToggleMinimize, onClose }) => {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-96 h-[600px] bg-background border border-border rounded-lg shadow-2xl flex flex-col">
+    <div className="fixed bottom-4 right-4 z-50 w-96 h-[600px] bg-background border border-border rounded-lg shadow-2xl flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border bg-primary text-primary-foreground rounded-t-lg">
+      <div className="flex items-center justify-between p-4 border-b border-border bg-primary text-primary-foreground rounded-t-lg flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-primary-foreground/10 rounded-full">
             <Bot className="h-5 w-5" />
@@ -295,7 +353,7 @@ const Chatbot = ({ isMinimized = false, onToggleMinimize, onClose }) => {
       </div>
 
       {/* Quick Actions */}
-      <div className="p-3 border-b border-border bg-accent/30">
+      <div className="p-3 border-b border-border bg-accent/30 flex-shrink-0">
         <div className="grid grid-cols-2 gap-2">
           {quickActions.map((action, index) => (
             <Button
@@ -303,17 +361,17 @@ const Chatbot = ({ isMinimized = false, onToggleMinimize, onClose }) => {
               variant="outline"
               size="sm"
               onClick={() => handleQuickAction(action.query)}
-              className="justify-start text-xs h-8"
+              className="justify-start text-xs h-8 overflow-hidden"
             >
-              <action.icon className="h-3 w-3 mr-1" />
-              {action.label}
+              <action.icon className="h-3 w-3 mr-1 flex-shrink-0" />
+              <span className="truncate">{action.label}</span>
             </Button>
           ))}
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-4">
         {messages.map((message) => (
           <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[80%] ${message.type === 'user' ? 'order-2' : 'order-1'}`}>
@@ -324,7 +382,21 @@ const Chatbot = ({ isMinimized = false, onToggleMinimize, onClose }) => {
                     : 'bg-muted mr-2'
                 }`}
               >
-                <p className="text-sm">{message.content}</p>
+                <div className="text-sm break-words whitespace-pre-wrap overflow-wrap-anywhere max-w-full">
+                  {message.content.split('\n').map((line, idx) => (
+                    <p key={idx} className="mb-1 last:mb-0">
+                      {line.includes('**') ? (
+                        line.split('**').map((part, i) => 
+                          i % 2 === 1 ? <strong key={i}>{part}</strong> : part
+                        )
+                      ) : line.startsWith('- ') ? (
+                        <span>• {line.substring(2)}</span>
+                      ) : (
+                        line || '\u00A0'
+                      )}
+                    </p>
+                  ))}
+                </div>
                 
                 {/* AI Response Metadata */}
                 {message.type === 'bot' && message.confidence && (
@@ -433,16 +505,16 @@ const Chatbot = ({ isMinimized = false, onToggleMinimize, onClose }) => {
       </div>
 
       {/* Input Area */}
-      <div className="p-4 border-t border-border">
+      <div className="p-4 border-t border-border flex-shrink-0">
         <div className="flex items-center gap-2">
-          <div className="flex-1 relative">
+          <div className="flex-1 relative min-w-0">
             <input
               type="text"
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+              onKeyPress={(e) => e.key === 'Enter' && !isTyping && handleSendMessage()}
               placeholder="Type your message..."
-              className="w-full pl-3 pr-12 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring text-sm"
+              className="w-full pl-3 pr-12 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring text-sm overflow-hidden"
             />
             <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex gap-1">
               <Button

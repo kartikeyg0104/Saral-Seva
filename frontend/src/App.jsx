@@ -3,8 +3,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import ProtectedRoute from "./components/ProtectedRoute";
+import ErrorBoundary from "./components/ErrorBoundary";
+import LoadingSpinner from "./components/LoadingSpinner";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Schemes from "./pages/Schemes";
@@ -23,6 +25,7 @@ import NotFound from "./pages/NotFound";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import Chatbot from "./components/Chatbot";
+import ScrollToTop from "./components/ScrollToTop";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,17 +42,20 @@ const App = () => {
   const [showChatbot, setShowChatbot] = useState(true);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <LanguageProvider>
-        <AuthProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter future={{ v7_relativeSplatPath: true }}>
-              <div className="min-h-screen flex flex-col">
-                <Header />
-                <main className="flex-1">
-                  <Routes>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <LanguageProvider>
+          <AuthProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter future={{ v7_relativeSplatPath: true }}>
+                <ScrollToTop />
+                <div className="min-h-screen flex flex-col bg-background">
+                  <Header />
+                  <main className="flex-1">
+                    <Suspense fallback={<LoadingSpinner variant="page" text="Loading page..." />}>
+                      <Routes>
                     <Route path="/" element={<Index />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
@@ -91,26 +97,28 @@ const App = () => {
                       </ProtectedRoute>
                     } />
                     
-                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </main>
-                <Footer />
-                
-                {/* AI Chatbot */}
-                {showChatbot && (
-                  <Chatbot
-                    isMinimized={isChatbotMinimized}
-                    onToggleMinimize={() => setIsChatbotMinimized(!isChatbotMinimized)}
-                    onClose={() => setShowChatbot(false)}
-                  />
-                )}
-              </div>
-            </BrowserRouter>
-          </TooltipProvider>
-        </AuthProvider>
-      </LanguageProvider>
-    </QueryClientProvider>
+                        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    </Suspense>
+                  </main>
+                  <Footer />
+                  
+                  {/* AI Chatbot */}
+                  {showChatbot && (
+                    <Chatbot
+                      isMinimized={isChatbotMinimized}
+                      onToggleMinimize={() => setIsChatbotMinimized(!isChatbotMinimized)}
+                      onClose={() => setShowChatbot(false)}
+                    />
+                  )}
+                </div>
+              </BrowserRouter>
+            </TooltipProvider>
+          </AuthProvider>
+        </LanguageProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 };
 

@@ -19,11 +19,12 @@ const chatbotQuery = async (req, res) => {
     
     if (!GOOGLE_API_KEY) {
       // Fallback response if API key is not configured
+      const fallbackResponse = generateIntelligentFallback(message);
       return res.status(200).json({
         success: true,
         data: {
-          response: "I'm the Saral Seva AI assistant. I can help you with government schemes, application processes, document verification, and more. However, I'm currently running in basic mode. Please contact support for full AI assistance.",
-          suggestions: ["Find schemes for me", "Check application status", "Government office locations", "Document verification help"]
+          response: fallbackResponse.response,
+          suggestions: fallbackResponse.suggestions
         }
       });
     }
@@ -41,7 +42,9 @@ const chatbotQuery = async (req, res) => {
     
     User message: ${message}`;
 
-    // Call Google Gemini API
+    // Call Google Gemini API with better error handling
+    console.log('Calling Gemini API with key:', GOOGLE_API_KEY ? 'Present' : 'Missing');
+    
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GOOGLE_API_KEY}`, {
       method: 'POST',
       headers: {
@@ -58,16 +61,47 @@ const chatbotQuery = async (req, res) => {
           topK: 40,
           topP: 0.95,
           maxOutputTokens: 1024,
-        }
+        },
+        safetySettings: [
+          {
+            category: "HARM_CATEGORY_HARASSMENT",
+            threshold: "BLOCK_NONE"
+          },
+          {
+            category: "HARM_CATEGORY_HATE_SPEECH",
+            threshold: "BLOCK_NONE"
+          },
+          {
+            category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+            threshold: "BLOCK_NONE"
+          },
+          {
+            category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+            threshold: "BLOCK_NONE"
+          }
+        ]
       })
     });
 
     if (!response.ok) {
-      throw new Error(`Google API error: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      console.error('Gemini API Error:', response.status, errorData);
+      throw new Error(`Google API error: ${response.status} - ${JSON.stringify(errorData)}`);
     }
 
     const data = await response.json();
-    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't process your request at the moment. Please try again.";
+    console.log('Gemini API Response:', JSON.stringify(data).substring(0, 200));
+    
+    // Better response extraction with fallback
+    let aiResponse;
+    if (data.candidates && data.candidates.length > 0 && data.candidates[0].content) {
+      aiResponse = data.candidates[0].content.parts?.[0]?.text;
+    }
+    
+    if (!aiResponse) {
+      console.warn('No AI response found, using fallback');
+      throw new Error('No response from Gemini API');
+    }
 
     // Generate contextual suggestions based on the query
     const suggestions = generateSuggestions(message.toLowerCase());
@@ -82,15 +116,237 @@ const chatbotQuery = async (req, res) => {
 
   } catch (error) {
     console.error('Chatbot error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error processing your request',
+    
+    // Instead of returning 500, return 200 with intelligent fallback
+    const fallbackResponse = generateIntelligentFallback(req.body.message);
+    
+    return res.status(200).json({
+      success: true,
       data: {
-        response: "I'm experiencing some technical difficulties. Please try again in a moment or contact support for assistance.",
-        suggestions: ["Try again", "Contact support", "Browse schemes", "Check application status"]
+        response: fallbackResponse.response,
+        suggestions: fallbackResponse.suggestions,
+        fallbackMode: true
       }
     });
   }
+};
+
+// Intelligent fallback response generator
+const generateIntelligentFallback = (message) => {
+  const lowerMessage = message.toLowerCase();
+  
+  // PM-KISAN related queries
+  if (lowerMessage.includes('pm-kisan') || lowerMessage.includes('pm kisan') || lowerMessage.includes('kisan')) {
+    return {
+      response: `**PM-KISAN Scheme Overview:**
+
+The Pradhan Mantri Kisan Samman Nidhi (PM-KISAN) is a central government scheme that provides financial assistance to farmers.
+
+**Key Benefits:**
+- ₹6,000 per year in 3 equal installments
+- Direct transfer to bank accounts
+- Support for small and marginal farmers
+
+**Eligibility:**
+- Farmers with cultivable landholding
+- Land ownership in farmer's name
+- All farmer families (except excluded categories)
+
+**How to Apply:**
+1. Visit PM-KISAN portal: pmkisan.gov.in
+2. Click on 'New Farmer Registration'
+3. Provide Aadhaar number and details
+4. Submit required documents
+
+Would you like to know more about eligibility criteria or application process?`,
+      suggestions: ["Check PM-KISAN eligibility", "How to apply for PM-KISAN", "PM-KISAN payment status", "Required documents"]
+    };
+  }
+  
+  // Ayushman Bharat queries
+  if (lowerMessage.includes('ayushman') || lowerMessage.includes('health') || lowerMessage.includes('medical')) {
+    return {
+      response: `**Ayushman Bharat - Pradhan Mantri Jan Arogya Yojana (PM-JAY):**
+
+A comprehensive health insurance scheme providing coverage for secondary and tertiary care hospitalization.
+
+**Key Benefits:**
+- Health coverage of ₹5 lakh per family per year
+- Covers 1,400+ procedures
+- Cashless treatment at empanelled hospitals
+- No cap on family size or age
+
+**Eligibility:**
+- Based on SECC 2011 data
+- Automatically eligible families receive benefits
+- Check eligibility on pmjay.gov.in
+
+**How to Check:**
+1. Visit: https://pmjay.gov.in
+2. Enter mobile number
+3. Verify with OTP
+4. Check eligibility status
+
+Need help with eligibility check or finding empanelled hospitals?`,
+      suggestions: ["Check Ayushman Bharat eligibility", "Find empanelled hospitals", "How to get Ayushman card", "Covered treatments"]
+    };
+  }
+  
+  // Startup India queries
+  if (lowerMessage.includes('startup') || lowerMessage.includes('business') || lowerMessage.includes('entrepreneur')) {
+    return {
+      response: `**Startup India Scheme:**
+
+An initiative to build a strong ecosystem for nurturing innovation and startups in India.
+
+**Key Benefits:**
+- Tax exemptions for 3 consecutive years
+- Self-certification compliance
+- IPR fast-tracking and 80% rebate on patents
+- Access to funding and mentorship
+- Relaxed norms for public procurement
+
+**Eligibility:**
+- Entity incorporated as a private limited company
+- Up to 10 years from date of incorporation
+- Annual turnover not exceeding ₹100 crore
+- Working towards innovation/development
+
+**How to Register:**
+1. Visit: https://www.startupindia.gov.in
+2. Click 'Register'
+3. Fill startup details
+4. Upload required documents
+5. Get recognition certificate
+
+Interested in tax benefits or funding opportunities?`,
+      suggestions: ["Startup India benefits", "How to register startup", "Startup funding options", "Tax exemptions for startups"]
+    };
+  }
+  
+  // Document verification queries
+  if (lowerMessage.includes('document') || lowerMessage.includes('verify') || lowerMessage.includes('aadhaar') || lowerMessage.includes('pan')) {
+    return {
+      response: `**Document Verification Services:**
+
+I can help you with various document verification processes:
+
+**Available Services:**
+1. **Aadhaar Verification** - Verify and update Aadhaar details
+2. **PAN Card** - Apply, verify, or link with Aadhaar
+3. **Income Certificate** - Apply for income certificate
+4. **Caste Certificate** - SC/ST/OBC certificate applications
+5. **Domicile Certificate** - State residence proof
+
+**Common Documents Required:**
+- Identity Proof (Aadhaar, Voter ID, Passport)
+- Address Proof (Utility bills, Rent agreement)
+- Photographs (passport size)
+- Application forms
+
+**Quick Links:**
+- Aadhaar: https://uidai.gov.in
+- PAN: https://www.incometax.gov.in
+- DigiLocker for documents: https://digilocker.gov.in
+
+Which document would you like to verify or apply for?`,
+      suggestions: ["Verify Aadhaar", "Apply for PAN card", "Income certificate", "Link Aadhaar-PAN"]
+    };
+  }
+  
+  // Eligibility checks
+  if (lowerMessage.includes('eligible') || lowerMessage.includes('eligibility')) {
+    return {
+      response: `**Government Scheme Eligibility Checker:**
+
+I can help you check eligibility for various government schemes based on:
+
+**Criteria Considered:**
+- Age and Gender
+- Income Level
+- Location (State/District)
+- Category (General/SC/ST/OBC)
+- Occupation
+- Educational Qualification
+
+**Popular Schemes by Category:**
+
+**Agriculture:** PM-KISAN, PM Fasal Bima Yojana
+**Education:** Scholarships, Skill Development
+**Healthcare:** Ayushman Bharat, PMJAY
+**Housing:** PMAY, Affordable Housing
+**Business:** Startup India, MUDRA Loan
+**Social Security:** PM-SYM, APY
+
+To provide accurate eligibility information, please tell me:
+1. Your age and occupation
+2. Your state/district
+3. Annual income range
+4. Specific scheme you're interested in
+
+Or ask about a specific scheme for detailed eligibility criteria!`,
+      suggestions: ["Agriculture schemes", "Education schemes", "Healthcare schemes", "Business schemes"]
+    };
+  }
+  
+  // Application status queries
+  if (lowerMessage.includes('status') || lowerMessage.includes('application') || lowerMessage.includes('track')) {
+    return {
+      response: `**Application Status Tracking:**
+
+You can track the status of your government scheme applications:
+
+**How to Check Status:**
+
+1. **PM-KISAN:** Visit pmkisan.gov.in → Beneficiary Status
+2. **Ayushman Bharat:** Visit pmjay.gov.in → Track Application
+3. **Scholarships:** Visit scholarships.gov.in → Login → Track
+4. **PAN Card:** Visit incometax.gov.in → Track Status
+5. **Passport:** Visit passportindia.gov.in → Track Status
+
+**Information Needed:**
+- Application/Reference Number
+- Registered Mobile Number
+- Aadhaar Number (for some schemes)
+
+**General Tracking:**
+Most schemes provide status updates via:
+- SMS to registered mobile
+- Email notifications
+- Online portals
+
+Which scheme's application status would you like to track?`,
+      suggestions: ["Track PM-KISAN status", "Track Ayushman application", "Scholarship status", "PAN card status"]
+    };
+  }
+  
+  // Default response
+  return {
+    response: `**Welcome to Saral Seva AI Assistant!** 🙏
+
+I'm here to help you with Indian government services and schemes. I can assist you with:
+
+**🎯 Popular Services:**
+- **Scheme Information:** PM-KISAN, Ayushman Bharat, Startup India, PMAY
+- **Eligibility Checks:** Find schemes you qualify for
+- **Application Process:** Step-by-step guidance
+- **Document Verification:** Aadhaar, PAN, certificates
+- **Status Tracking:** Check your application status
+- **Government Offices:** Find nearby locations
+
+**💡 Example Questions:**
+- "Am I eligible for PM-KISAN scheme?"
+- "What are the benefits of Ayushman Bharat?"
+- "How to apply for Startup India?"
+- "Documents needed for income certificate"
+- "Track my scholarship application"
+
+**🌐 Multi-Language Support:**
+You can ask questions in English, Hindi, or Hinglish!
+
+What would you like to know about government schemes or services today?`,
+    suggestions: ["Find schemes for me", "Check eligibility", "Document verification", "Track application status"]
+  };
 };
 
 // Helper function to generate contextual suggestions

@@ -36,6 +36,7 @@ export const validateUserRegistration = [
     .normalizeEmail(),
   
   body('phone')
+    .trim()
     .matches(/^[6-9]\d{9}$/)
     .withMessage('Please provide a valid 10-digit Indian mobile number'),
   

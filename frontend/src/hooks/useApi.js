@@ -338,7 +338,11 @@ export const useChatbot = () => {
 export const useApi = () => {
   const apiCall = async (url, options = {}) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('authToken');
+      
+      // Get base URL from environment - IMPORTANT: Don't add /api here as it's already in VITE_API_URL
+      const baseURL = import.meta.env.VITE_API_URL || 'https://saral-seva-backend.onrender.com/api';
+      
       const defaultOptions = {
         headers: {
           'Content-Type': 'application/json',
@@ -346,7 +350,11 @@ export const useApi = () => {
         },
       };
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${url}`, {
+      // Construct full URL - url parameter should NOT start with /api
+      const fullURL = `${baseURL}${url}`;
+      console.log('API Call to:', fullURL);
+
+      const response = await fetch(fullURL, {
         ...defaultOptions,
         ...options,
         headers: {
@@ -356,7 +364,8 @@ export const useApi = () => {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
