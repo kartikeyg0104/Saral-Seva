@@ -182,7 +182,27 @@ const Register = () => {
     if (!validateStep(4)) return;
     
     try {
-      await register(formData);
+      // Format the data to match backend requirements
+      const registrationData = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phone: formData.phone,
+        password: formData.password,
+        dateOfBirth: formData.dateOfBirth,
+        gender: formData.gender,
+        address: {
+          street: formData.address,
+          city: formData.city,
+          state: formData.state,
+          pincode: formData.pincode
+        },
+        occupation: formData.occupation || 'Not specified',
+        annualIncome: formData.income ? parseInt(formData.income) || 0 : 0,
+        category: formData.category || 'general'
+      };
+      
+      await register(registrationData);
       toast({
         title: t('auth.registrationSuccessful'),
         description: "Welcome to Saral Seva! Please verify your email.",
@@ -514,11 +534,11 @@ const Register = () => {
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 transition-all bg-gray-50/50 focus:bg-white"
                 >
                   <option value="">Select income range</option>
-                  <option value="below-2.5">Below ₹2.5 Lakh</option>
-                  <option value="2.5-5">₹2.5 - ₹5 Lakh</option>
-                  <option value="5-10">₹5 - ₹10 Lakh</option>
-                  <option value="10-25">₹10 - ₹25 Lakh</option>
-                  <option value="above-25">Above ₹25 Lakh</option>
+                  <option value="250000">Below ₹2.5 Lakh</option>
+                  <option value="500000">₹2.5 - ₹5 Lakh</option>
+                  <option value="1000000">₹5 - ₹10 Lakh</option>
+                  <option value="2500000">₹10 - ₹25 Lakh</option>
+                  <option value="5000000">Above ₹25 Lakh</option>
                 </select>
               </div>
             </div>
@@ -536,7 +556,7 @@ const Register = () => {
                 <option value="obc">OBC</option>
                 <option value="sc">SC</option>
                 <option value="st">ST</option>
-                <option value="ews">EWS</option>
+                <option value="other">Other</option>
               </select>
             </div>
 

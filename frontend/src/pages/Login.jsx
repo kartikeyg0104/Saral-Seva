@@ -78,7 +78,11 @@ const Login = () => {
     }
     
     try {
-      await login({ email: formData.email, password: formData.password });
+      await login({ 
+        identifier: formData.email, 
+        password: formData.password,
+        loginMethod: 'email'
+      });
       toast({
         title: t('auth.loginSuccessful'),
         description: "Redirecting to dashboard...",
