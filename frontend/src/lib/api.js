@@ -3,7 +3,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 
 // Mock authentication for development
 const MOCK_AUTH = {
-  enabled: import.meta.env.VITE_NODE_ENV === 'development' || !import.meta.env.VITE_API_URL, // Enable if in dev or no API URL set
+  enabled: (import.meta.env.VITE_NODE_ENV === 'development' || !import.meta.env.VITE_API_URL) && import.meta.env.VITE_USE_MOCK_API !== 'false', // Enable if in dev or no API URL set, but not if explicitly disabled
   get users() {
     // Get users from localStorage or use defaults
     const stored = localStorage.getItem('mock_auth_users');
@@ -120,6 +120,15 @@ class ApiClient {
   }
 
   async request(endpoint, options = {}) {
+    console.log('API Request Debug:', {
+      endpoint,
+      baseURL: this.baseURL,
+      mockEnabled: MOCK_AUTH.enabled,
+      env: import.meta.env.VITE_NODE_ENV,
+      apiUrl: import.meta.env.VITE_API_URL,
+      useMock: import.meta.env.VITE_USE_MOCK_API
+    });
+    
     // If mock auth is enabled and it's an auth endpoint, use mock
     if (MOCK_AUTH.enabled && endpoint.startsWith('/auth/')) {
       try {
@@ -194,7 +203,17 @@ class ApiClient {
     }
 
     try {
+      console.log('Making fetch request to:', url);
+      console.log('Request config:', config);
+      
       const response = await fetch(url, config);
+      
+      console.log('Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+      
       const data = await response.json();
 
       if (!response.ok) {
@@ -210,6 +229,16 @@ class ApiClient {
       return data;
     } catch (error) {
       console.error('API Request failed:', error);
+      
+      // Check if it's a CORS error
+      if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
+        console.error('This might be a CORS error. Check:');
+        console.error('1. Backend CORS configuration');
+        console.error('2. Network connectivity');
+        console.error('3. Backend server is running');
+        console.error('Request was to:', url);
+      }
+      
       throw error;
     }
   }

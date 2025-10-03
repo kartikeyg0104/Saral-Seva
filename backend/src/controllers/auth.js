@@ -38,7 +38,8 @@ const sendTokenResponse = (user, statusCode, res) => {
           phone: user.phone,
           role: user.role,
           isVerified: user.isVerified,
-          isActive: user.isActive
+          isActive: user.isActive,
+          language: user.language
         }
       }
     });
